@@ -14,15 +14,21 @@ class UnitEconomicsCalculator:
             'margin_acceptable': 10,
             'ltv_cac_excellent': 5,
             'ltv_cac_good': 3,
-            'ltv_cac_acceptable': 2
+            'ltv_cac_acceptable': 2,
+            'profit_weight': 25,
+            'resource_weight': 15,
+            'operations_weight': 15,
+            'financial_weight': 15,
+            'intelligence_weight': 15,
+            'transformation_weight': 15
         }
     
     def calculate_unit_economics(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Основной метод расчета юнит-экономики
         """
-        # Базовые данные
-        selling_price = data.get('selling_price', 0)
+        # Базовые данные с проверкой на None
+        selling_price = data.get('selling_price', 0) or 0
         
         # Расчет себестоимости (COGS)
         total_cogs = self._calculate_cogs(data)
@@ -42,12 +48,14 @@ class UnitEconomicsCalculator:
         # Прибыль с единицы
         unit_profit = selling_price - total_costs
         
-        # Маржинальность
+        # Маржинальность (с защитой от деления на ноль)
         profit_margin = (unit_profit / selling_price * 100) if selling_price > 0 else 0
         
-        # Расчет дополнительных метрик
+        # Вклад в маржу (с защитой от деления на ноль)
         contribution_margin = selling_price - total_cogs - marketplace_costs
-        breakeven_price = total_costs / 0.8  # Цена для 20% маржи
+        
+        # Безубыточная цена (с защитой от деления на ноль)
+        breakeven_price = total_costs if total_costs <= 0 else total_costs / 0.8  # Цена для 20% маржи
         
         return {
             'selling_price': selling_price,
@@ -63,22 +71,40 @@ class UnitEconomicsCalculator:
         }
     
     def _calculate_cogs(self, data: Dict[str, Any]) -> float:
-        """Расчет себестоимости товара"""
-        purchase_cost = data.get('purchase_cost', 0)
-        packaging_cost = data.get('packaging_cost', 0)
-        labeling_cost = data.get('labeling_cost', 0)
-        quality_control = data.get('quality_control', 0)
-        certification = data.get('certification', 0)
+        """
+        Расчет себестоимости товара (Cost of Goods Sold)
+        
+        Включает:
+        - Закупочную стоимость
+        - Стоимость упаковки
+        - Стоимость маркировки
+        - Расходы на контроль качества
+        - Расходы на сертификацию
+        """
+        purchase_cost = data.get('purchase_cost', 0) or 0
+        packaging_cost = data.get('packaging_cost', 0) or 0
+        labeling_cost = data.get('labeling_cost', 0) or 0
+        quality_control = data.get('quality_control', 0) or 0
+        certification = data.get('certification', 0) or 0
         
         return purchase_cost + packaging_cost + labeling_cost + quality_control + certification
     
     def _calculate_marketplace_costs(self, data: Dict[str, Any]) -> float:
-        """Расчет расходов маркетплейса"""
-        selling_price = data.get('selling_price', 0)
-        commission_rate = data.get('commission_rate', 15) / 100
-        fulfillment_cost = data.get('fulfillment_cost', 0)
-        storage_total = data.get('storage_total', 0)
-        payment_amount = data.get('payment_amount', 0)
+        """
+        Расчет расходов маркетплейса
+        
+        Включает:
+        - Комиссию маркетплейса
+        - Стоимость фулфилмента
+        - Стоимость хранения
+        - Стоимость обработки платежа
+        - Дополнительные комиссии (например, маркетинговая комиссия OZON)
+        """
+        selling_price = data.get('selling_price', 0) or 0
+        commission_rate = (data.get('commission_rate', 15) or 15) / 100  # Защита от None
+        fulfillment_cost = data.get('fulfillment_cost', 0) or 0
+        storage_total = data.get('storage_total', 0) or 0
+        payment_amount = data.get('payment_amount', 0) or 0
         
         commission_amount = selling_price * commission_rate
         
@@ -91,19 +117,34 @@ class UnitEconomicsCalculator:
         return commission_amount + fulfillment_cost + storage_total + payment_amount + additional_costs
     
     def _calculate_marketing_costs(self, data: Dict[str, Any]) -> float:
-        """Расчет маркетинговых расходов"""
-        ppc_cost_per_unit = data.get('ppc_cost_per_unit', 0)
-        external_marketing = data.get('external_marketing', 0)
-        influencer_marketing = data.get('influencer_marketing', 0)
-        content_creation = data.get('content_creation', 0)
+        """
+        Расчет маркетинговых расходов
+        
+        Включает:
+        - Стоимость PPC рекламы на единицу
+        - Стоимость внешнего маркетинга на единицу
+        - Расходы на инфлюенсеров на единицу
+        - Затраты на создание контента на единицу
+        """
+        ppc_cost_per_unit = data.get('ppc_cost_per_unit', 0) or 0
+        external_marketing = data.get('external_marketing', 0) or 0
+        influencer_marketing = data.get('influencer_marketing', 0) or 0
+        content_creation = data.get('content_creation', 0) or 0
         
         return ppc_cost_per_unit + external_marketing + influencer_marketing + content_creation
     
     def _calculate_operational_costs(self, data: Dict[str, Any]) -> float:
-        """Расчет операционных расходов"""
-        fixed_cost_per_unit = data.get('fixed_cost_per_unit', 0)
-        customer_service = data.get('customer_service', 0)
-        return_cost_per_unit = data.get('return_cost_per_unit', 0)
+        """
+        Расчет операционных расходов
+        
+        Включает:
+        - Фиксированные расходы на единицу товара
+        - Расходы на обслуживание клиентов
+        - Расходы на обработку возвратов
+        """
+        fixed_cost_per_unit = data.get('fixed_cost_per_unit', 0) or 0
+        customer_service = data.get('customer_service', 0) or 0
+        return_cost_per_unit = data.get('return_cost_per_unit', 0) or 0
         
         return fixed_cost_per_unit + customer_service + return_cost_per_unit
     
@@ -298,4 +339,122 @@ class UnitEconomicsCalculator:
             # Пересчитываем метрики
             results[scenario_name] = self.calculate_unit_economics(scenario_data)
         
+        return results
+    
+    def calculate_cohort_ltv(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Расширенный расчет LTV с учетом когортного анализа
+        
+        Учитывает снижение удержания клиентов по месяцам и позволяет
+        более точно прогнозировать долгосрочную ценность клиента.
+        """
+        # Получаем базовые параметры
+        selling_price = data.get('selling_price', 0) or 0
+        gross_margin = data.get('profit_margin', 0) or 0
+        repeat_purchase_rate = data.get('repeat_purchase_rate', 0) or 0
+        customer_lifespan_months = data.get('customer_lifespan_months', 0) or 0
+        churn_rate = 1 - (repeat_purchase_rate / 100)
+        
+        # Защита от деления на ноль и некорректных значений
+        if churn_rate <= 0 or churn_rate >= 1:
+            churn_rate = 0.5  # Значение по умолчанию, если данные некорректны
+        
+        # Рассчитываем удержание по месяцам
+        months = min(36, customer_lifespan_months)  # Ограничиваем период для стабильности расчетов
+        retention_by_month = [repeat_purchase_rate/100 * (1 - churn_rate)**(i) for i in range(months)]
+        
+        # Рассчитываем доход по месяцам с учетом удержания и маржи
+        revenue_by_month = [selling_price * retention * (gross_margin/100) for retention in retention_by_month]
+        
+        # Рассчитываем накопительный LTV
+        cumulative_ltv = np.cumsum(revenue_by_month).tolist()
+        
+        # Дисконтированный LTV (с учетом временной стоимости денег)
+        discount_rate = 0.1/12  # Месячная ставка дисконтирования (примерно 10% годовых)
+        discounted_revenue = [rev / ((1 + discount_rate)**i) for i, rev in enumerate(revenue_by_month)]
+        discounted_ltv = np.cumsum(discounted_revenue).tolist()
+        
+        return {
+            'ltv_simple': sum(revenue_by_month),  # Старый метод расчета
+            'ltv_discounted': sum(discounted_revenue),  # LTV с учетом дисконтирования
+            'retention_by_month': retention_by_month,
+            'revenue_by_month': revenue_by_month,
+            'cumulative_ltv': cumulative_ltv,
+            'discounted_ltv': discounted_ltv
+        }
+    
+    def calculate_inventory_metrics(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Расчет метрик оборачиваемости запасов и денежного цикла
+        """
+        avg_inventory = data.get('avg_inventory', 0) or 0
+        monthly_cogs = data.get('monthly_cogs', 0) or 0
+        payment_terms_days = data.get('payment_terms_days', 30) or 30
+        supplier_terms_days = data.get('supplier_terms_days', 0) or 0
+        
+        # Защита от деления на ноль
+        if monthly_cogs <= 0:
+            return {
+                'inventory_turnover': 0,
+                'days_inventory': 0,
+                'cash_conversion_cycle': 0
+            }
+        
+        # Расчет оборачиваемости запасов (месячной)
+        inventory_turnover = monthly_cogs / avg_inventory if avg_inventory > 0 else 0
+        
+        # Дни хранения запасов
+        days_inventory = 30 / inventory_turnover if inventory_turnover > 0 else 0
+        
+        # Денежный цикл
+        cash_conversion_cycle = days_inventory + payment_terms_days - supplier_terms_days
+        
+        return {
+            'inventory_turnover': inventory_turnover,
+            'days_inventory': days_inventory,
+            'cash_conversion_cycle': cash_conversion_cycle
+        }
+    
+    def perform_sensitivity_analysis(self, base_data: Dict[str, Any], 
+                                   variables: List[str], 
+                                   percent_changes: List[float]) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Анализ чувствительности модели к изменению ключевых переменных
+        
+        Args:
+            base_data: Исходные данные для расчета
+            variables: Список переменных для анализа чувствительности
+            percent_changes: Список процентных изменений для каждой переменной
+            
+        Returns:
+            Словарь с результатами по каждой переменной
+        """
+        results = {}
+        
+        for var in variables:
+            var_results = []
+            original_value = base_data.get(var, 0)
+            
+            if original_value == 0:
+                continue
+                
+            for change in percent_changes:
+                # Копируем исходные данные
+                modified_data = base_data.copy()
+                
+                # Модифицируем переменную
+                modified_data[var] = original_value * (1 + change/100)
+                
+                # Рассчитываем юнит-экономику с измененным значением
+                result = self.calculate_unit_economics(modified_data)
+                
+                # Добавляем информацию об изменении
+                result['variable'] = var
+                result['percent_change'] = change
+                result['modified_value'] = modified_data[var]
+                
+                var_results.append(result)
+            
+            results[var] = var_results
+                
         return results

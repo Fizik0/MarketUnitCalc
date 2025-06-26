@@ -38,6 +38,7 @@ def create_dashboard():
     
     # Дополнительные аналитические блоки
     show_ltv_cac_analysis(data)
+    show_cohort_ltv_analysis(data)
     show_profit_matrix(data)
     show_recommendations_summary(data)
 
@@ -405,6 +406,138 @@ def show_ltv_cac_analysis(data):
             st.warning("⚠️ Умеренная окупаемость")
         else:
             st.error("🔴 Медленная окупаемость")
+
+def show_cohort_ltv_analysis(data):
+    """Отображение расширенного анализа LTV с когортами"""
+    st.subheader("👥 Когортный анализ LTV")
+    
+    calculator = UnitEconomicsCalculator()
+    cohort_data = calculator.calculate_cohort_ltv(data)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # График удержания по месяцам
+        retention_months = list(range(1, len(cohort_data['retention_by_month']) + 1))
+        retention_values = [r * 100 for r in cohort_data['retention_by_month']]
+        
+        fig_retention = px.line(
+            x=retention_months,
+            y=retention_values,
+            markers=True,
+            title="Удержание клиентов по месяцам",
+            labels={'x': 'Месяц', 'y': 'Удержание (%)'},
+            color_discrete_sequence=['#2D6A9D']
+        )
+        
+        fig_retention.update_traces(
+            hovertemplate='Месяц %{x}: %{y:.1f}%<extra></extra>'
+        )
+        
+        fig_retention.update_layout(
+            xaxis=dict(tickmode='linear', dtick=1),
+            yaxis=dict(range=[0, max(retention_values) * 1.1])
+        )
+        
+        st.plotly_chart(fig_retention, use_container_width=True)
+        
+        # Информация о LTV
+        st.info(f"""
+        **Сравнение методов расчета LTV:**
+        - Простой LTV: {cohort_data['ltv_simple']:,.0f} ₽
+        - Дисконтированный LTV: {cohort_data['ltv_discounted']:,.0f} ₽
+        - Разница: {cohort_data['ltv_simple'] - cohort_data['ltv_discounted']:,.0f} ₽ ({(1 - cohort_data['ltv_discounted'] / cohort_data['ltv_simple']) * 100 if cohort_data['ltv_simple'] > 0 else 0:.1f}%)
+        
+        Дисконтирование учитывает временную стоимость денег, что делает расчет более точным.
+        """)
+    
+    with col2:
+        # График накопительного LTV
+        months = list(range(1, len(cohort_data['cumulative_ltv']) + 1))
+        
+        fig_ltv = go.Figure()
+        
+        # Накопительный LTV без дисконтирования
+        fig_ltv.add_trace(go.Scatter(
+            x=months,
+            y=cohort_data['cumulative_ltv'],
+            name='LTV простой',
+            mode='lines',
+            line=dict(color='#2D6A9D', width=2),
+            hovertemplate='Месяц %{x}: %{y:,.0f} ₽<extra></extra>'
+        ))
+        
+        # Накопительный LTV с дисконтированием
+        fig_ltv.add_trace(go.Scatter(
+            x=months,
+            y=cohort_data['discounted_ltv'],
+            name='LTV с дисконтированием',
+            mode='lines',
+            line=dict(color='#9D2D3C', width=2, dash='dash'),
+            hovertemplate='Месяц %{x}: %{y:,.0f} ₽<extra></extra>'
+        ))
+        
+        # Точка окупаемости CAC
+        cac = data.get('cac', 0)
+        if cac > 0:
+            # Находим месяц окупаемости без дисконтирования
+            payback_month = next((i for i, value in enumerate(cohort_data['cumulative_ltv']) if value >= cac), len(months))
+            payback_month_disc = next((i for i, value in enumerate(cohort_data['discounted_ltv']) if value >= cac), len(months))
+            
+            if payback_month < len(months):
+                payback_month += 1  # Корректировка индексации
+                fig_ltv.add_trace(go.Scatter(
+                    x=[payback_month],
+                    y=[cohort_data['cumulative_ltv'][payback_month-1]],
+                    name='Точка окупаемости',
+                    mode='markers',
+                    marker=dict(color='green', size=10, symbol='star'),
+                    hovertemplate=f'Окупаемость: {payback_month} мес.<extra></extra>'
+                ))
+            
+            if payback_month_disc < len(months):
+                payback_month_disc += 1  # Корректировка индексации
+                fig_ltv.add_trace(go.Scatter(
+                    x=[payback_month_disc],
+                    y=[cohort_data['discounted_ltv'][payback_month_disc-1]],
+                    name='Точка окупаемости (диск.)',
+                    mode='markers',
+                    marker=dict(color='orange', size=10, symbol='star'),
+                    hovertemplate=f'Окупаемость (диск.): {payback_month_disc} мес.<extra></extra>'
+                ))
+            
+            # Горизонтальная линия CAC
+            fig_ltv.add_trace(go.Scatter(
+                x=[1, len(months)],
+                y=[cac, cac],
+                name='CAC',
+                mode='lines',
+                line=dict(color='red', width=1, dash='dot'),
+                hovertemplate=f'CAC: {cac:,.0f} ₽<extra></extra>'
+            ))
+        
+        fig_ltv.update_layout(
+            title="Накопительный LTV по месяцам",
+            xaxis_title="Месяц",
+            yaxis_title="LTV (₽)",
+            xaxis=dict(tickmode='linear', dtick=1),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig_ltv, use_container_width=True)
+        
+    # Таблица с детализацией
+    with st.expander("🔍 Детализация по месяцам"):
+        months = list(range(1, len(cohort_data['revenue_by_month']) + 1))
+        ltv_data = pd.DataFrame({
+            'Месяц': months,
+            'Удержание (%)': [r * 100 for r in cohort_data['retention_by_month']],
+            'Доход за месяц (₽)': cohort_data['revenue_by_month'],
+            'Накопительный LTV (₽)': cohort_data['cumulative_ltv'],
+            'Дисконтированный LTV (₽)': cohort_data['discounted_ltv']
+        })
+        
+        st.dataframe(ltv_data, use_container_width=True, hide_index=True)
 
 def show_profit_matrix(data):
     """P.R.O.F.I.T. матрица"""
