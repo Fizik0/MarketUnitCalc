@@ -258,13 +258,19 @@ class UnitEconomicsCalculator:
             )
         
         # Анализ областей для улучшения
-        marketplace_percentage = (result['marketplace_costs'] / result['selling_price']) * 100
+        marketplace_percentage = 0
+        if result['selling_price'] > 0:
+            marketplace_percentage = (result['marketplace_costs'] / result['selling_price']) * 100
+        
         if marketplace_percentage > 30:
             recommendations['improvements'].append(
                 f"Высокие расходы маркетплейса ({marketplace_percentage:.1f}%). Рассмотрите смену категории или платформы."
             )
         
-        marketing_percentage = (result['marketing_costs'] / result['selling_price']) * 100
+        marketing_percentage = 0
+        if result['selling_price'] > 0:
+            marketing_percentage = (result['marketing_costs'] / result['selling_price']) * 100
+            
         if marketing_percentage > 25:
             recommendations['improvements'].append(
                 f"Высокие маркетинговые расходы ({marketing_percentage:.1f}%). Оптимизируйте рекламные кампании."
@@ -279,17 +285,24 @@ class UnitEconomicsCalculator:
                 f"Отличная маржинальность ({result['profit_margin']:.1f}%). Потенциал для масштабирования."
             )
         
-        cogs_percentage = (result['total_cogs'] / result['selling_price']) * 100
+        cogs_percentage = 0
+        if result['selling_price'] > 0:
+            cogs_percentage = (result['total_cogs'] / result['selling_price']) * 100
+            
         if cogs_percentage < 40:
             recommendations['strengths'].append(
                 f"Эффективная структура себестоимости ({cogs_percentage:.1f}%)."
             )
         
         # P.R.O.F.I.T. Matrix
+        operations_percentage = 0
+        if result['selling_price'] > 0:
+            operations_percentage = (result['operational_costs'] / result['selling_price']) * 100
+            
         recommendations['profit_matrix'] = {
             'Profitability': min(100, max(0, result['profit_margin'] * 3)),
             'Resource Optimization': min(100, max(0, 100 - cogs_percentage)),
-            'Operations Excellence': min(100, max(0, 100 - (result['operational_costs'] / result['selling_price']) * 1000)),
+            'Operations Excellence': min(100, max(0, 100 - operations_percentage * 10)),
             'Financial Intelligence': min(100, max(0, profit_score)),
             'Intelligence Automation': 60,  # Базовое значение
             'Transformation Strategy': min(100, max(0, result['profit_margin'] * 2))

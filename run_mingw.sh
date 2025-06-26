@@ -17,5 +17,5 @@ echo "Установка необходимых пакетов..."
 pip install streamlit pandas numpy plotly fpdf streamlit-option-menu watchdog
 
 # Запуск приложения
-echo "Запуск приложения..."
-python -m streamlit run app.py 
+echo "Запуск приложения на порту 8501..."
+python -m streamlit run app.py --server.port 8501 
